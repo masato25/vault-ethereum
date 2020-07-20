@@ -17,8 +17,11 @@ package main
 import (
 	"context"
 	"fmt"
+	"math/big"
 
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 )
@@ -65,7 +68,57 @@ Get a list of all the transaction IDs on a block.
 				logical.ReadOperation: b.pathBlockTransactionsList,
 			},
 		},
+		&framework.Path{
+			Pattern:         "block/info/current_block",
+			HelpSynopsis:    "Get current block",
+			HelpDescription: "Get current block",
+			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.ReadOperation: b.currentBlockHeight,
+			},
+		},
 	}
+}
+
+func (b *EthereumBackend) currentBlockHeight(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	config, err := b.configured(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+	client, err := rpc.DialContext(ctx, config.getRPCURL())
+	if err != nil {
+		return nil, fmt.Errorf("cannot connect to " + config.getRPCURL())
+	}
+	var resp string
+	if err := client.CallContext(ctx, &resp, "eth_blockNumber"); err != nil {
+		return nil, fmt.Errorf("[rpc_client] " + err.Error())
+	}
+
+	number, err := hexutil.DecodeUint64(resp)
+	if err != nil {
+		return nil, fmt.Errorf("[hex_converter] " + err.Error())
+	}
+
+	blockNumber := big.NewInt(int64(number))
+
+	eclient, err := ethclient.Dial(config.getRPCURL())
+	if err != nil {
+		return nil, fmt.Errorf("cannot connect to " + config.getRPCURL())
+	}
+
+	block, err := eclient.BlockByNumber(context.Background(), blockNumber)
+	if err != nil {
+		return nil, err
+	}
+
+	return &logical.Response{
+		Data: map[string]interface{}{
+			"block":             block.Number().Uint64(),
+			"time":              block.Time(),
+			"difficulty":        block.Difficulty().Uint64(),
+			"block_hash":        block.Hash().Hex(),
+			"transaction_count": len(block.Transactions()),
+		},
+	}, nil
 }
 
 func (b *EthereumBackend) pathBlockRead(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
