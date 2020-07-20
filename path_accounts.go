@@ -46,6 +46,7 @@ const (
 // Account is an Ethereum account
 type Account struct {
 	Address            string   `json:"address"` // Ethereum account address derived from the private key
+	Role               string   `json:"role"`    // Role of user
 	PrivateKey         string   `json:"private_key"`
 	PublicKey          string   `json:"public_key"` // Ethereum public key derived from the private key
 	Passphrase         string   `json:"passphrase"`
@@ -83,6 +84,7 @@ the new passphrase.
 `,
 			Fields: map[string]*framework.FieldSchema{
 				"name": &framework.FieldSchema{Type: framework.TypeString},
+				"role": &framework.FieldSchema{Type: framework.TypeString},
 				"whitelist": &framework.FieldSchema{
 					Type:        framework.TypeCommaStringSlice,
 					Description: "The list of accounts that this account can send ETH to.",
@@ -343,6 +345,7 @@ func (b *EthereumBackend) pathAccountsRead(ctx context.Context, req *logical.Req
 	return &logical.Response{
 		Data: map[string]interface{}{
 			"address":              account.Address,
+			"role":                 account.Role,
 			"whitelist":            account.Whitelist,
 			"blacklist":            account.Blacklist,
 			"spending_limit_tx":    account.SpendingLimitTx,
@@ -354,12 +357,24 @@ func (b *EthereumBackend) pathAccountsRead(ctx context.Context, req *logical.Req
 	}, nil
 }
 
+var roles = []string{"superAdmin", "admin", "user"}
+
 func (b *EthereumBackend) pathAccountsCreate(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
 	_, err := b.configured(ctx, req)
 	if err != nil {
 		return nil, err
 	}
 	name := data.Get("name").(string)
+	role := data.Get("role").(string)
+	rflag := false
+	for _, r := range roles {
+		if role == r {
+			rflag = true
+		}
+	}
+	if !rflag {
+		return nil, fmt.Errorf("not vaild role")
+	}
 	spendingLimitTxString := data.Get("spending_limit_tx").(string)
 	spendingLimitTx, err := decimal.NewFromString(spendingLimitTxString)
 	if err != nil || spendingLimitTx.IsNegative() {
@@ -402,6 +417,7 @@ func (b *EthereumBackend) pathAccountsCreate(ctx context.Context, req *logical.R
 
 	accountJSON := &Account{
 		Address:            address,
+		Role:               role,
 		PrivateKey:         privateKeyString,
 		PublicKey:          publicKeyString,
 		Whitelist:          Dedup(whiteList),
@@ -423,6 +439,7 @@ func (b *EthereumBackend) pathAccountsCreate(ctx context.Context, req *logical.R
 	return &logical.Response{
 		Data: map[string]interface{}{
 			"address":              accountJSON.Address,
+			"role":                 accountJSON.Role,
 			"whitelist":            accountJSON.Whitelist,
 			"blacklist":            accountJSON.Blacklist,
 			"spending_limit_tx":    accountJSON.SpendingLimitTx,
@@ -484,6 +501,7 @@ func (b *EthereumBackend) pathAccountUpdate(ctx context.Context, req *logical.Re
 	return &logical.Response{
 		Data: map[string]interface{}{
 			"address":              account.Address,
+			"role":                 account.Role,
 			"whitelist":            account.Whitelist,
 			"blacklist":            account.Blacklist,
 			"spending_limit_tx":    account.SpendingLimitTx,
