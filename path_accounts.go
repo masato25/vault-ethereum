@@ -342,6 +342,11 @@ func (b *EthereumBackend) pathAccountsRead(ctx context.Context, req *logical.Req
 	if err != nil {
 		return nil, err
 	}
+
+	balanceToDecimal := decimal.NewFromBigInt(balance, 0)
+
+	balanceEth := ConvertFromWei(ETH, balanceToDecimal)
+
 	return &logical.Response{
 		Data: map[string]interface{}{
 			"address":              account.Address,
@@ -352,6 +357,7 @@ func (b *EthereumBackend) pathAccountsRead(ctx context.Context, req *logical.Req
 			"spending_limit_total": account.SpendingLimitTotal,
 			"total_spend":          account.TotalSpend,
 			"balance":              balance,
+			"balance_eth":          balanceEth,
 			"balance_in_usd":       exchangeValue,
 		},
 	}, nil
