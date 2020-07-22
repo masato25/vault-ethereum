@@ -20,7 +20,11 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"strings"
+
 	"math/big"
+
+	gcc "github.com/ethereum/go-ethereum/common/compiler"
 
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
@@ -85,6 +89,18 @@ Deploys an Ethereum contract.
 				logical.CreateOperation: b.pathCreateContract,
 				logical.ReadOperation:   b.pathReadContract,
 				logical.DeleteOperation: b.pathContractsDelete,
+			},
+		},
+		&framework.Path{
+			Pattern: "contracts/complier",
+			Fields: map[string]*framework.FieldSchema{
+				"contract": &framework.FieldSchema{Type: framework.TypeString},
+			},
+			HelpSynopsis:    "Get current block",
+			HelpDescription: "Get current block",
+			ExistenceCheck:  b.pathExistenceCheck,
+			Callbacks: map[logical.Operation]framework.OperationFunc{
+				logical.CreateOperation: b.pathContractsComplie,
 			},
 		},
 	}
@@ -297,4 +313,34 @@ func (b *EthereumBackend) pathContractsDelete(ctx context.Context, req *logical.
 	}
 
 	return nil, nil
+}
+
+/* add for template, because 0.6.x no many contract are supported right now */
+/* solc per-install is required */
+func (b *EthereumBackend) pathContractsComplie(ctx context.Context, req *logical.Request, data *framework.FieldData) (*logical.Response, error) {
+	_, err := b.configured(ctx, req)
+	if err != nil {
+		return nil, err
+	}
+
+	_, err = req.Storage.Get(ctx, req.Path)
+
+	if err != nil {
+		return nil, err
+	}
+
+	contractstring := data.Get("contract").(string)
+	contracts, err := gcc.CompileSolidityString("solcjs", contractstring)
+	if err != nil {
+		return nil, fmt.Errorf("[solidity compiler]error compiling source. result %v: %v", contracts, err)
+	}
+	resp := map[string]interface{}{}
+	for k, v := range contracts {
+		k = strings.Replace(k, "<stdin>:", "", -1)
+		resp[k] = v
+	}
+	// collectcontracts =
+	return &logical.Response{
+		Data: resp,
+	}, nil
 }
