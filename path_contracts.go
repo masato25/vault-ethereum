@@ -64,6 +64,7 @@ Deploys an Ethereum contract.
 				"amount": &framework.FieldSchema{
 					Type:        framework.TypeString,
 					Description: "Amount of ETH to fund the contract in Wei.",
+					Default:     "0",
 				},
 				"nonce": &framework.FieldSchema{
 					Type:        framework.TypeString,
@@ -73,10 +74,12 @@ Deploys an Ethereum contract.
 				"gas_price": &framework.FieldSchema{
 					Type:        framework.TypeString,
 					Description: "The price in gas for the transaction.",
+					Default:     "0",
 				},
 				"gas_limit": &framework.FieldSchema{
 					Type:        framework.TypeString,
 					Description: "The gas limit in Wei for the transaction.",
+					Default:     "0",
 				},
 				"send": &framework.FieldSchema{
 					Type:        framework.TypeBool,
@@ -134,6 +137,9 @@ func (b *EthereumBackend) pathCreateContract(ctx context.Context, req *logical.R
 	name := data.Get("name").(string)
 	sendTransaction := data.Get("send").(bool)
 	account, err := b.readAccount(ctx, req, name)
+	if account == nil {
+		return nil, fmt.Errorf("account %s not found", name)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error reading account")
 	}
