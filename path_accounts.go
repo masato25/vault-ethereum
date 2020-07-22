@@ -420,7 +420,7 @@ func (b *EthereumBackend) pathAccountsCreate(ctx context.Context, req *logical.R
 	hash := sha3.NewLegacyKeccak256()
 	hash.Write(publicKeyBytes[1:])
 	address := hexutil.Encode(hash.Sum(nil)[12:])
-
+	address = common.HexToAddress(address).Hex()
 	accountJSON := &Account{
 		Address:            address,
 		Role:               role,
